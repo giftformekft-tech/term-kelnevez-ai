@@ -5,6 +5,12 @@ from tkinter import filedialog, messagebox, ttk, simpledialog
 
 import requests
 
+try:
+    from PIL import Image, ImageFilter
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+
 # =========================
 # 1) IDE ÍRD BE A KULCSOD
 # =========================
@@ -397,6 +403,10 @@ class App(tk.Tk):
         # Képnév megtartása (csak JSON)
         self.keep_original_name = tk.BooleanVar(value=False)
 
+        # Pixeles peremezés
+        self.do_choke = tk.BooleanVar(value=False)
+        self.choke_px = tk.IntVar(value=2)
+
         # JSON mezők
         self.want_desc = tk.BooleanVar(value=True)
         self.want_short = tk.BooleanVar(value=True)
@@ -459,6 +469,14 @@ class App(tk.Tk):
         tk.Checkbutton(row1, text="Fő kategória", variable=self.want_main).pack(side="left", padx=14)
         tk.Checkbutton(row1, text="Alkategória", variable=self.want_sub).pack(side="left", padx=14)
         tk.Checkbutton(row1, text="Címkék (tags)", variable=self.want_tags).pack(side="left", padx=14)
+
+        # ---- Képfeldolgozás
+        imgbox = tk.LabelFrame(self, text="Képfeldolgozás (PNG)")
+        imgbox.pack(fill="x", padx=10, pady=8)
+        ri = tk.Frame(imgbox); ri.pack(fill="x", padx=8, pady=6)
+        tk.Checkbutton(ri, text="Pink szegély levágása (Choke PNG Alpha)", variable=self.do_choke).pack(side="left")
+        tk.Label(ri, text="   Mérték (pixel):").pack(side="left")
+        ttk.Spinbox(ri, from_=1, to=10, textvariable=self.choke_px, width=3).pack(side="left", padx=5)
 
         # ---- Category relationship editor (UI)
         rel = tk.LabelFrame(self, text="Kategória kapcsolatok (Fő → Alkategóriák)")
@@ -745,6 +763,7 @@ class App(tk.Tk):
         self.logline(f"Modell: {MODEL}")
         self.logline(f"Mappa: {folder}")
         self.logline(f"Dry run: {self.dry_run.get()} | JSON: {self.make_json.get()} | Keep original name: {self.keep_original_name.get()}")
+        self.logline(f"Képfeldolgozás: {'Igen (Szűkítés: '+str(self.choke_px.get())+'px)' if self.do_choke.get() else 'Nem'}")
         self.logline(f"Kreatív mód: {self.creative_mode.get()} | Brand: {self.allow_brands.get()}")
         self.logline(f"JSON mezők: desc={self.want_desc.get()}, short={self.want_short.get()}, main={self.want_main.get()}, sub={self.want_sub.get()}, tags={self.want_tags.get()}")
         if self.force_main.get():
@@ -844,9 +863,33 @@ class App(tk.Tk):
                 if self.make_json.get():
                     target_json.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
-                # Átnevezés
-                if (not self.dry_run.get()) and (not self.keep_original_name.get()):
-                    img.rename(target_img)
+                # Átnevezés és Képfeldolgozás (Choke)
+                if not self.dry_run.get():
+                    if self.do_choke.get() and img.suffix.lower() == ".png":
+                        if not HAS_PIL:
+                            self.after(0, lambda: self.logline("   ✖ Hiba: Pillow modul hiányzik a peremlevágáshoz! Telepítsd: pip install Pillow"))
+                            if not self.keep_original_name.get() and img != target_img:
+                                img.rename(target_img)
+                        else:
+                            try:
+                                with Image.open(img) as im:
+                                    out_im = im.convert("RGBA")
+                                    r, g, b, a = out_im.split()
+                                    filter_size = self.choke_px.get() * 2 + 1
+                                    a = a.filter(ImageFilter.MinFilter(filter_size))
+                                    out_im = Image.merge("RGBA", (r, g, b, a))
+                                    out_im.save(target_img)
+                                
+                                # Ha újat hoztunk létre és az eredeti már nem kell
+                                if not self.keep_original_name.get() and img != target_img:
+                                    img.unlink()
+                            except Exception as ex:
+                                self.after(0, lambda e=str(ex): self.logline(f"   ✖ Képfeldolgozási hiba: {e}"))
+                                if not self.keep_original_name.get() and img != target_img:
+                                    img.rename(target_img)
+                    else:
+                        if not self.keep_original_name.get() and img != target_img:
+                            img.rename(target_img)
 
                 conf = float(meta.get("confidence", 0))
                 cat_info = ""
