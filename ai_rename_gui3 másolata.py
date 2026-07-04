@@ -813,6 +813,22 @@ class App(tk.Tk):
         else:
             instructions += "Ne használj brand/márkaneveket. "
 
+        if self.want_desc.get():
+            instructions += (
+                "A description mezőbe írj egy egyedi, SEO-barát terméklírást a képen látható DIZÁJN alapján. "
+                "A dizájnt egy egyedi, nyomtatott ruhadarab (póló) mintájaként kezeld, de a 'póló' szót SOHA ne írd le. "
+                "Használj helyette semleges megfogalmazást, pl. 'egyedi dizájn', 'nyomat', 'minta', 'grafika'. "
+                "A leírás emelje ki a dizájn témáját, hangulatát, stílusát, hogy kinek/milyen alkalomra ajándék. "
+                "Természetesen épüljön be néhány kulcsszó (a témához illő keresőszavak), de ne legyen kulcsszóhalmozás, "
+                "olvasmányos, marketinges hangvételű legyen. Kb. 2-4 mondat, egyedi, ne sablonos. "
+            )
+
+        if self.want_short.get():
+            instructions += (
+                "A short_description mezőbe írj egy tömör, figyelemfelkeltő, SEO-barát összefoglalót (1 mondat, max ~160 karakter) "
+                "ugyanerről a dizájnról, a 'póló' szó említése nélkül. "
+            )
+
         if self.want_sub.get() or self.want_main.get():
             if fixed_main:
                 instructions += (
